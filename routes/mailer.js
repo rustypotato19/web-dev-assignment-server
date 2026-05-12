@@ -58,4 +58,45 @@ router.post("/welcome", async (req, res) => {
     }
 });
 
+router.post("/contact", async (req, res) => {
+    const { name, email, message } = req.body;
+
+    if (!name || !email || !message) {
+        return res.status(400).json({
+            success: false,
+            error: "Missing fields"
+        });
+    }
+
+    try {
+        await transporter.sendMail({
+            from: `"Website Contact" <${process.env.GMAIL_USER}>`,
+            to: process.env.GMAIL_USER, // send to yourself
+            subject: `New Contact Form Message from ${name}`,
+            html: `
+                <div style="font-family: Arial, sans-serif;">
+                    <h2>New Contact Form Submission</h2>
+
+                    <p><strong>Name:</strong> ${name}</p>
+                    <p><strong>Email:</strong> ${email}</p>
+
+                    <hr />
+
+                    <p><strong>Message:</strong></p>
+                    <p>${message}</p>
+                </div>
+            `
+        });
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error("CONTACT EMAIL ERROR:", err);
+
+        res.status(500).json({
+            success: false,
+            error: "Failed to send email"
+        });
+    }
+});
+
 module.exports = router;
