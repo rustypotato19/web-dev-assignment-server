@@ -1,12 +1,12 @@
 const router = require("express").Router();
 const db = require("../db");
 
-/* GET FRIENDS */
+/* ================= GET FRIENDS ================= */
 router.get("/:uid", async (req, res) => {
     const { uid } = req.params;
 
     try {
-        const result = await db.query(
+        const [rows] = await db.query(
             `SELECT
                 u.uid,
                 u.username,
@@ -16,12 +16,12 @@ router.get("/:uid", async (req, res) => {
              FROM user_friends f
              JOIN users u
                 ON u.uid = f.friend_uid
-             WHERE f.user_uid = $1`,
+             WHERE f.user_uid = ?`,
             [uid]
         );
 
         return res.json({
-            friends: result.rows
+            friends: rows
         });
 
     } catch (err) {
@@ -34,7 +34,7 @@ router.get("/:uid", async (req, res) => {
     }
 });
 
-/* ADD FRIEND */
+/* ================= ADD FRIEND (BIDIRECTIONAL) ================= */
 router.post("/add", async (req, res) => {
     const { user_uid, friend_uid } = req.body;
 
@@ -53,31 +53,24 @@ router.post("/add", async (req, res) => {
     }
 
     try {
-        await db.query("BEGIN");
-
+        /* insert both directions */
         await db.query(
-            `INSERT INTO user_friends (user_uid, friend_uid)
-             VALUES ($1, $2)
-             ON CONFLICT DO NOTHING`,
+            `INSERT IGNORE INTO user_friends (user_uid, friend_uid)
+             VALUES (?, ?)`,
             [user_uid, friend_uid]
         );
 
         await db.query(
-            `INSERT INTO user_friends (user_uid, friend_uid)
-             VALUES ($1, $2)
-             ON CONFLICT DO NOTHING`,
+            `INSERT IGNORE INTO user_friends (user_uid, friend_uid)
+             VALUES (?, ?)`,
             [friend_uid, user_uid]
         );
-
-        await db.query("COMMIT");
 
         return res.json({
             success: true
         });
 
     } catch (err) {
-        await db.query("ROLLBACK");
-
         console.error("ADD FRIEND ERROR:", err);
 
         return res.status(500).json({
@@ -87,36 +80,28 @@ router.post("/add", async (req, res) => {
     }
 });
 
-/* REMOVE FRIEND */
+/* ================= REMOVE FRIEND (BIDIRECTIONAL) ================= */
 router.delete("/remove", async (req, res) => {
     const { user_uid, friend_uid } = req.body;
 
     try {
-        await db.query("BEGIN");
-
         await db.query(
             `DELETE FROM user_friends
-             WHERE user_uid = $1
-             AND friend_uid = $2`,
+             WHERE user_uid = ? AND friend_uid = ?`,
             [user_uid, friend_uid]
         );
 
         await db.query(
             `DELETE FROM user_friends
-             WHERE user_uid = $1
-             AND friend_uid = $2`,
+             WHERE user_uid = ? AND friend_uid = ?`,
             [friend_uid, user_uid]
         );
-
-        await db.query("COMMIT");
 
         return res.json({
             success: true
         });
 
     } catch (err) {
-        await db.query("ROLLBACK");
-
         console.error("REMOVE FRIEND ERROR:", err);
 
         return res.status(500).json({

@@ -2,26 +2,27 @@ const router = require("express").Router();
 const db = require("../db");
 const { comparePassword, hashPassword } = require("../utils/hash");
 
+/* ================= LOGIN BY EMAIL ================= */
 router.post("/login/email", async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password)
         return res.json({ success: false, error: "Missing fields" });
 
-    const result = await db.query(
-        "SELECT * FROM users WHERE email = $1",
+    const [rows] = await db.query(
+        "SELECT * FROM users WHERE email = ?",
         [email]
     );
 
-    if (!result.rows.length)
-        return res.json({ success: false });
+    if (!rows.length)
+        return res.json({ success: false, error: "User not found" });
 
-    const user = result.rows[0];
+    const user = rows[0];
 
     const match = await comparePassword(password, user.password);
 
     if (!match)
-        return res.json({ success: false });
+        return res.json({ success: false, error: "Invalid password" });
 
     return res.json({
         success: true,
@@ -35,22 +36,22 @@ router.post("/login/email", async (req, res) => {
     });
 });
 
-
+/* ================= LOGIN BY USERNAME ================= */
 router.post("/login/username", async (req, res) => {
     const { username, password } = req.body;
 
     if (!username || !password)
         return res.json({ success: false, error: "Missing fields" });
 
-    const result = await db.query(
-        "SELECT * FROM users WHERE username = $1",
+    const [rows] = await db.query(
+        "SELECT * FROM users WHERE username = ?",
         [username]
     );
 
-    if (!result.rows.length)
+    if (!rows.length)
         return res.json({ success: false });
 
-    const user = result.rows[0];
+    const user = rows[0];
 
     const match = await comparePassword(password, user.password);
 
@@ -69,6 +70,7 @@ router.post("/login/username", async (req, res) => {
     });
 });
 
+/* ================= SIGNUP ================= */
 router.post("/signup", async (req, res) => {
     const {
         email,
@@ -87,13 +89,13 @@ router.post("/signup", async (req, res) => {
             });
         }
 
-        // prevent duplicates
-        const exists = await db.query(
-            `SELECT uid FROM users WHERE email = $1 OR username = $2`,
+        /* check duplicates */
+        const [exists] = await db.query(
+            "SELECT uid FROM users WHERE email = ? OR username = ?",
             [email, username]
         );
 
-        if (exists.rows.length > 0) {
+        if (exists.length > 0) {
             return res.json({
                 success: false,
                 error: "Email or username already exists"
@@ -102,41 +104,40 @@ router.post("/signup", async (req, res) => {
 
         const hashed = await hashPassword(password);
 
-        const result = await db.query(
+        const [result] = await db.query(
             `INSERT INTO users 
             (email, username, fullname, date_of_birth, password, profile_image)
-            VALUES ($1,$2,$3,$4,$5,$6)
-            RETURNING uid`,
+            VALUES (?, ?, ?, ?, ?, ?)`,
             [email, username, fullname, date_of_birth, hashed, profile_image]
         );
 
-        res.json({
+        return res.json({
             success: true,
-            uid: result.rows[0].uid
+            uid: result.insertId
         });
 
     } catch (err) {
         console.error("SIGNUP ERROR:", err);
 
-        res.json({
+        return res.json({
             success: false,
             error: "Server error"
         });
     }
 });
 
-/* Check if email exists */
+/* ================= CHECK EMAIL EXISTS ================= */
 router.get("/ver/email/:email", async (req, res) => {
     const { email } = req.params;
 
     try {
-        const result = await db.query(
-            "SELECT uid FROM users WHERE email = $1",
+        const [rows] = await db.query(
+            "SELECT uid FROM users WHERE email = ?",
             [email]
         );
 
         return res.json({
-            exists: result.rows.length > 0
+            exists: rows.length > 0
         });
 
     } catch (err) {
@@ -149,18 +150,18 @@ router.get("/ver/email/:email", async (req, res) => {
     }
 });
 
-/* Check if username exists */
+/* ================= CHECK USERNAME EXISTS ================= */
 router.get("/ver/username/:username", async (req, res) => {
     const { username } = req.params;
 
     try {
-        const result = await db.query(
-            "SELECT uid FROM users WHERE username = $1",
+        const [rows] = await db.query(
+            "SELECT uid FROM users WHERE username = ?",
             [username]
         );
 
         return res.json({
-            exists: result.rows.length > 0
+            exists: rows.length > 0
         });
 
     } catch (err) {

@@ -1,48 +1,50 @@
 const router = require("express").Router();
 const db = require("../db");
 
-/* USER EVENTS */
+/* ================= USER EVENTS ================= */
 router.get("/user/:uid", async (req, res) => {
     const { uid } = req.params;
 
-    const result = await db.query(
-        "SELECT * FROM user_events WHERE uid = $1",
+    const [rows] = await db.query(
+        "SELECT * FROM user_events WHERE uid = ?",
         [uid]
     );
 
-    res.json(result.rows);
+    res.json(rows);
 });
 
-/* CREATE USER EVENT */
+/* ================= CREATE USER EVENT ================= */
 router.post("/user/create/:uid", async (req, res) => {
     const { uid } = req.params;
     const { name, date } = req.body;
 
-    const result = await db.query(
+    const [result] = await db.query(
         `INSERT INTO user_events (uid, name, date)
-         VALUES ($1,$2,$3)
-         RETURNING *`,
+         VALUES (?, ?, ?)`,
         [uid, name, date]
     );
 
-    res.json(result.rows[0]);
+    /* MySQL insertId → re-fetch full row */
+    const [rows] = await db.query(
+        "SELECT * FROM user_events WHERE eventid = ?",
+        [result.insertId]
+    );
+
+    res.json(rows[0]);
 });
 
-/* DELETE USER EVENT */
+/* ================= DELETE USER EVENT ================= */
 router.delete("/user/delete/:id", async (req, res) => {
     try {
         const { id } = req.params;
 
-        const result = await db.query(
-            `
-            DELETE FROM user_events
-            WHERE eventid = $1
-            RETURNING eventid
-            `,
-            [id],
+        const [result] = await db.query(
+            `DELETE FROM user_events
+             WHERE eventid = ?`,
+            [id]
         );
 
-        if (result.rowCount === 0) {
+        if (result.affectedRows === 0) {
             return res.status(404).json({
                 success: false,
                 message: "Event not found",
@@ -51,7 +53,7 @@ router.delete("/user/delete/:id", async (req, res) => {
 
         return res.json({
             success: true,
-            deleted: result.rows[0].eventid,
+            deleted: id,
         });
     } catch (err) {
         console.error(err);
@@ -62,18 +64,27 @@ router.delete("/user/delete/:id", async (req, res) => {
     }
 });
 
-/* FIXED EVENTS */
+/* ================= FIXED EVENTS ================= */
 router.get("/fixed", async (req, res) => {
-    await db.query(`
-        DELETE FROM fixed_events
-        WHERE date < CURRENT_DATE
-    `);
+    try {
+        /* delete expired fixed events */
+        await db.query(`
+            DELETE FROM fixed_events
+            WHERE date < CURDATE()
+        `);
 
-    const result = await db.query(
-        "SELECT * FROM fixed_events ORDER BY date ASC"
-    );
+        const [rows] = await db.query(
+            "SELECT * FROM fixed_events ORDER BY date ASC"
+        );
 
-    res.json(result.rows);
+        res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch fixed events",
+        });
+    }
 });
 
 module.exports = router;

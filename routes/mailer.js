@@ -1,7 +1,7 @@
 const router = require("express").Router();
-
 const transporter = require("../utils/mail");
 
+/* ================= WELCOME EMAIL ================= */
 router.post("/welcome", async (req, res) => {
     const { email, username } = req.body;
 
@@ -23,18 +23,14 @@ router.post("/welcome", async (req, res) => {
                         Welcome to mygiftlist.com!
                     </h1>
 
-                    <p>
-                        Hi <strong>${username}</strong>,
-                    </p>
+                    <p>Hi <strong>${escapeHtml(username)}</strong>,</p>
 
                     <p>
                         Your account was created successfully and you're now ready
                         to start creating gift lists, adding friends, and sharing ideas.
                     </p>
 
-                    <p>
-                        We're excited to have you here 🎁
-                    </p>
+                    <p>We're excited to have you here 🎁</p>
 
                     <hr style="margin: 24px 0;" />
 
@@ -45,19 +41,19 @@ router.post("/welcome", async (req, res) => {
             `
         });
 
-        res.json({
-            success: true
-        });
+        return res.json({ success: true });
+
     } catch (err) {
         console.error("WELCOME EMAIL ERROR:", err);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: "Failed to send welcome email"
         });
     }
 });
 
+/* ================= CONTACT EMAIL ================= */
 router.post("/contact", async (req, res) => {
     const { name, email, message } = req.body;
 
@@ -71,32 +67,43 @@ router.post("/contact", async (req, res) => {
     try {
         await transporter.sendMail({
             from: `"Website Contact" <${process.env.GMAIL_USER}>`,
-            to: process.env.GMAIL_USER, // send to yourself
+            to: process.env.GMAIL_USER,
             subject: `New Contact Form Message from ${name}`,
             html: `
                 <div style="font-family: Arial, sans-serif;">
                     <h2>New Contact Form Submission</h2>
 
-                    <p><strong>Name:</strong> ${name}</p>
-                    <p><strong>Email:</strong> ${email}</p>
+                    <p><strong>Name:</strong> ${escapeHtml(name)}</p>
+                    <p><strong>Email:</strong> ${escapeHtml(email)}</p>
 
                     <hr />
 
                     <p><strong>Message:</strong></p>
-                    <p>${message}</p>
+                    <p>${escapeHtml(message)}</p>
                 </div>
             `
         });
 
-        res.json({ success: true });
+        return res.json({ success: true });
+
     } catch (err) {
         console.error("CONTACT EMAIL ERROR:", err);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: "Failed to send email"
         });
     }
 });
+
+/* ================= BASIC HTML ESCAPE ================= */
+function escapeHtml(str) {
+    return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
 
 module.exports = router;
