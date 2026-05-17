@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "upload": "scp -r ./routes ./utils .env db.js server.js rusty@10.8.0.1:/home/rusty/servers/webdev_server/"
   },
   "keywords": [],
   "author": "",

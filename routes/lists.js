@@ -57,6 +57,33 @@ router.get("/member/:uid", async (req, res) => {
     }
 });
 
+/* ================= GET MEMBERS (UID) IN A LIST ================= */
+router.get("/members/:listid", async (req, res) => {
+    const { listid } = req.params;
+
+    try {
+        const [rows] = await db.query(
+            `SELECT member_uid
+             FROM list_members
+             WHERE listid = ?`,
+            [listid]
+        );
+
+        // flatten into clean array: [1,2,3]
+        const members = rows.map(r => r.member_uid);
+
+        return res.json(members);
+
+    } catch (err) {
+        console.error("GET LIST MEMBERS ERROR:", err);
+
+        return res.status(500).json({
+            success: false,
+            error: "Server error"
+        });
+    }
+});
+
 /* ================= GET LIST ITEMS ================= */
 router.get("/items/:listid", async (req, res) => {
     const { listid } = req.params;
